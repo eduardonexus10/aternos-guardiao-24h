@@ -1,0 +1,43 @@
+name: Guardião Aternos 24/7 (Sem PC Ligado)
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Verifica a cada 30 minutos; se já houver um bot rodando, o próximo aguarda na fila para assumir sem deixar cair
+    - cron: '*/30 * * * *'
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: guardiao-aternos-24h
+  cancel-in-progress: false
+
+jobs:
+  manter-servidor-aberto:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+
+    steps:
+      - name: Baixar código do Guardião
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Iniciar Bot Fantasma Anti-AFK (Protocolo 775 - Minecraft 26.1.2)
+        env:
+          MC_HOST: ${{ vars.MC_HOST || 'Edubrainex.aternos.me' }}
+          MC_PORT: ${{ vars.MC_PORT || '34601' }}
+          MC_BOT_NAME: ${{ vars.MC_BOT_NAME || 'Guardiao_Nuvem' }}
+          SMART_LEAVE: 'false'
+        run: node bot_nuvem.js --max-minutes 315
+
+      - name: Reenfileirar próximo ciclo contínuo
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run guardiao-24h.yml || true

@@ -1,0 +1,16 @@
+{
+  "name": "guardiao-aternos-nuvem",
+  "version": "2.0.0",
+  "description": "Bot Fantasma Anti-AFK ultra-leve (Protocolo 775 / Minecraft 26.1.2) para manter servidor Aternos aberto 24/7 sem PC ligado",
+  "main": "bot_nuvem.js",
+  "scripts": {
+    "start": "node bot_nuvem.js --web",
+    "bot": "node bot_nuvem.js",
+    "ping": "node bot_nuvem.js --ping-only",
+    "guardiao": "node guardiao.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT"
+}
