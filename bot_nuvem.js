@@ -200,10 +200,12 @@ class AternosGhostBot {
         this.host = options.host || DEFAULT_HOST;
         this.port = options.port || DEFAULT_PORT;
         this.username = options.username || DEFAULT_BOT_NAME;
-        this.smartLeave = Boolean(options.smartLeave);
+        this.smartLeave = options.smartLeave !== undefined ? Boolean(options.smartLeave) : true;
         this.reconnectDelayMs = options.reconnectDelayMs || 6000;
         this.maxRunMs = options.maxMinutes ? options.maxMinutes * 60 * 1000 : 0;
         this.onLog = options.onLog || ((msg) => console.log(`[${new Date().toLocaleTimeString()}] ${msg}`));
+        this.checkingPlayers = false;
+        this.standbyLogCount = 0;
 
         this.socket = null;
         this.recvBuffer = Buffer.alloc(0);
@@ -281,7 +283,7 @@ class AternosGhostBot {
         this.hasSpawnPos = false;
     }
 
-    scheduleReconnect(reason) {
+    scheduleReconnect(reason, customDelayMs = null, silent = false) {
         if (this.stopped) return;
         this.cleanupSocket();
         this.stats.state = 'Aguardando reconexão';
@@ -292,14 +294,17 @@ class AternosGhostBot {
             return;
         }
 
-        this.log(`${reason} | Tentando novamente em ${Math.round(this.reconnectDelayMs / 1000)}s...`);
+        const delayMs = customDelayMs || this.reconnectDelayMs;
+        if (!silent) {
+            this.log(`${reason} | Tentando novamente em ${Math.round(delayMs / 1000)}s...`);
+        }
         clearTimeout(this.reconnectTimer);
         this.reconnectTimer = setTimeout(() => {
             if (!this.stopped) {
                 this.stats.reconnects++;
                 this.connectCycle();
             }
-        }, this.reconnectDelayMs);
+        }, delayMs);
     }
 
     async connectCycle() {
@@ -319,10 +324,17 @@ class AternosGhostBot {
 
         this.stats.playersOnline = status.players.online;
 
-        // No modo inteligente, se já existe um jogador humano jogando, o bot não precisa ocupar vaga
+        // No modo inteligente, se já existe um jogador humano jogando, o bot fica em standby fora do servidor
         if (this.smartLeave && status.players.online > 0) {
-            return this.scheduleReconnect(`Jogador real detectado (${status.players.online}/${status.players.max}). Bot aguardando em standby`);
+            if (this.standbyLogCount % 10 === 0) {
+                this.log(`Jogador real no mundo (${status.players.online}/${status.players.max}). Bot em standby fora do servidor para você dormir/jogar em paz...`);
+            }
+            this.standbyLogCount++;
+            this.scheduleReconnect('Aguardando todos os jogadores saírem para o bot reassumir', 6000, true);
+            this.stats.state = 'Standby (Jogador humano online)';
+            return;
         }
+        this.standbyLogCount = 0;
 
         this.connectTcp();
     }
@@ -540,6 +552,10 @@ class AternosGhostBot {
         }
 
         if (this.state === 'PLAY') {
+            // Detecção instantânea de entrada de jogador (Player Info Update 0x46 ou System Chat 0x79 após os primeiros 3s)
+            if (this.smartLeave && (packetId === 0x46 || packetId === 0x79) && this.connectedSince && (Date.now() - this.connectedSince > 3000)) {
+                setTimeout(() => this.checkPlayersAndLeaveIfHuman(), 400);
+            }
             if (packetId === 0x0B) {
                 // CLIENTBOUND_CHUNK_BATCH_FINISHED -> responde SERVERBOUND_CHUNK_BATCH_RECEIVED (0x0B)
                 const floatBuf = Buffer.alloc(4);
@@ -664,10 +680,18 @@ class AternosGhostBot {
             }
         }, 15000);
 
-        // Checagem contínua de integridade no DNS/servidor real (e modo --auto-leave)
-        this.pingCheckTimer = setInterval(async () => {
+        // Checagem contínua de integridade no DNS/servidor real (e modo --auto-leave a cada 8s)
+        this.pingCheckTimer = setInterval(() => {
+            this.checkPlayersAndLeaveIfHuman();
+        }, 8000);
+    }
+
+    async checkPlayersAndLeaveIfHuman() {
+        if (this.checkingPlayers || this.state !== 'PLAY' || this.stopped) return;
+        this.checkingPlayers = true;
+        try {
+            const status = await pingServer(this.host, this.port, 3500);
             if (this.state !== 'PLAY' || this.stopped) return;
-            const status = await pingServer(this.host, this.port, 4000);
             if (!status.online) {
                 this.scheduleReconnect(`Servidor real ainda não está online (${status.statusLabel}). Reconectando...`);
                 return;
@@ -678,9 +702,12 @@ class AternosGhostBot {
                 return;
             }
             if (this.smartLeave && status.players.online >= 2) {
-                this.scheduleReconnect(`Outro jogador entrou (${status.players.online}/${status.players.max})! Bot liberando vaga e entrando em standby`);
+                this.standbyLogCount = 0;
+                this.scheduleReconnect(`Jogador real entrou no mundo (${status.players.online}/${status.players.max})! Saindo imediatamente para liberar a cama/sono`);
             }
-        }, 25000);
+        } finally {
+            this.checkingPlayers = false;
+        }
     }
 }
 
@@ -697,7 +724,7 @@ if (require.main === module) {
     const port = parseInt(getArg('--port', String(DEFAULT_PORT)), 10);
     const username = getArg('--name', DEFAULT_BOT_NAME);
     const maxMinutes = parseInt(getArg('--max-minutes', process.env.MAX_MINUTES || '0'), 10);
-    const smartLeave = args.includes('--auto-leave') || process.env.SMART_LEAVE === 'true';
+    const smartLeave = !args.includes('--no-auto-leave') && process.env.SMART_LEAVE !== 'false';
 
     if (args.includes('--ping-only')) {
         pingServer(host, port).then((res) => {

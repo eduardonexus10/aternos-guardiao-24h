@@ -407,7 +407,7 @@ async function handleRewardedAd() {
 
 // Modo 2: Apenas Bot Fantasma AFK (zero Chrome, consome ~15 MB de RAM)
 async function runBotMode(options = {}) {
-    const smartLeave = options.smartLeave ?? false;
+    const smartLeave = options.smartLeave ?? true;
     const autoReturn = options.autoReturn ?? true;
 
     console.clear();
@@ -451,7 +451,7 @@ async function runSupremeMode() {
         console.log('[Sucesso] O servidor JÁ está Online! Pulando Chrome e conectando Bot Fantasma...\n');
         notifyBeep();
         await sleep(1000);
-        return runBotMode({ smartLeave: false });
+        return runBotMode({ smartLeave: true });
     }
 
     console.log('[Info] Servidor está Offline. Iniciando Chrome para ligar pelo painel...');
@@ -475,7 +475,7 @@ async function runSupremeMode() {
             await closeAternosChromeTab(tab);
             notifyBeep();
             await sleep(1500);
-            return runBotMode({ smartLeave: false });
+            return runBotMode({ smartLeave: true });
         }
 
         tab = (await getAternosTab()) || tab;
@@ -539,7 +539,7 @@ async function runSupremeMode() {
             await closeAternosChromeTab(tab);
             notifyBeep();
             await sleep(2000);
-            return runBotMode({ smartLeave: false });
+            return runBotMode({ smartLeave: true });
         }
 
         if (state.canStart || state.status.toLowerCase().includes('offline')) {
@@ -750,7 +750,7 @@ async function showMenu() {
         if (opt === '1') {
             await runSupremeMode();
         } else if (opt === '2') {
-            await runBotMode({ smartLeave: false });
+            await runBotMode({ smartLeave: true });
         } else if (opt === '3') {
             await runBotMode({ smartLeave: true, autoReturn: true });
         } else if (opt === '4') {

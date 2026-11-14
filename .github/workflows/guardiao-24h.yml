@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: guardiao-aternos-24h
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   manter-servidor-aberto:
@@ -33,8 +33,8 @@ jobs:
           MC_HOST: ${{ vars.MC_HOST || 'Edubrainex.aternos.me' }}
           MC_PORT: ${{ vars.MC_PORT || '34601' }}
           MC_BOT_NAME: ${{ vars.MC_BOT_NAME || 'Guardiao_Nuvem' }}
-          SMART_LEAVE: 'false'
-        run: node bot_nuvem.js --max-minutes 315
+          SMART_LEAVE: 'true'
+        run: node bot_nuvem.js --auto-leave --max-minutes 315
 
       - name: Reenfileirar próximo ciclo contínuo
         if: always()
