@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: guardiao-aternos-24h
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   manter-servidor-aberto:
@@ -37,7 +37,7 @@ jobs:
         run: node bot_nuvem.js --auto-leave --max-minutes 315
 
       - name: Reenfileirar próximo ciclo contínuo
-        if: always()
+        if: ${{ !cancelled() }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh workflow run guardiao-24h.yml || true
